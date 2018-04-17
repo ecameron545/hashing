@@ -359,38 +359,35 @@ public class OpenAddressingHashMap<K, V> implements Map<K, V> {
 	 * @param val
 	 *            The value to which this key is associated
 	 */
-	int j = 0;
 
 	public void put(K key, V val) {
 
-
-		if ((numPairs++ + deleteds) / table.length >= loadFactor) 
+		// if the table gets to full, rehash
+		if ((++numPairs + deleteds) / table.length >= loadFactor)
 			rehash();
-			
+
 		Iterator<Integer> probe = prober.probe(key);
 
-	
-		// loop until current is empty or the table ends
-		do  {
+		// until the table ends
+		do {
 			int current = probe.next();
-			
-			if(table[current] == deleted)
+
+			// if the current position is deleted, skip it
+			if (table[current] == deleted)
 				continue;
-			
-			if(table[current] == null) {
+
+			// if the current position is null, add a new pair
+			if (table[current] == null) {
 				table[current] = new Pair<K, V>(key, val);
 				numPairs++;
 				return;
 			}
-				
 
+			// if the current position is the key, update the value
 			if (table[current].key.equals(key)) {
 				table[current].value = val;
 				return;
 			}
-			
-			
-
 
 		} while (probe.hasNext());
 	}
@@ -402,30 +399,36 @@ public class OpenAddressingHashMap<K, V> implements Map<K, V> {
 	synchronized private void rehash() {
 		assert !rehashing;
 		rehashing = true;
+
 		int oldNumPairs = numPairs;
-		int newSize = prober.resize(oldNumPairs);
-		h = HashFactory.plainOldHashFunction(newSize);
-		Pair<K, V>[] newTable = (Pair<K, V>[]) new Pair[newSize];
+		int newSize = prober.resize(oldNumPairs); // new hash table size
+		h = HashFactory.plainOldHashFunction(newSize); // new hash function
+		Pair<K, V>[] newTable = (Pair<K, V>[]) new Pair[newSize]; // new hash table
 
 		for (int i = 0; i < table.length; i++) {
+			// ignore any deleted or null spots in the old table
 			if (table[i] == deleted || table[i] == null)
 				continue;
 
-			// new hash
-			int hashh = h.hash(table[i].key);
-			int oldHash = hashh;
+			// new hash of the old key with respect to the new hash table
+			int newHash = h.hash(table[i].key);
 
-			while (hashh < newSize - 1 && (newTable[hashh] != null && newTable[hashh] != deleted))
-				hashh++;
+			// look for empty spots until the end of the hash table
+			while (newHash < newSize - 1 && (newTable[newHash] != null && newTable[newHash] != deleted))
+				newHash++;
 
-			if (hashh == newSize - 1 && (newTable[hashh] != null && newTable[hashh] != deleted)) {
-				hashh = 0;
-				while (hashh < oldHash && (newTable[hashh] != null && newTable[hashh] != deleted))
-					hashh++;
+			// if you reach the end of the table, and the value at that position isn't null,
+			// set newHash to 0 and start looking from the beginning of the table.
+			if (newHash == newSize - 1 && (newTable[newHash] != null && newTable[newHash] != deleted)) {
+				newHash = 0;
+				// go till newHash reaches an open spot
+				while ((newTable[newHash] != null && newTable[newHash] != deleted))
+					newHash++;
 			}
-			newTable[hashh] = table[i];
+			// put the old value (table[i]) into the new hash table at the correct position
+			newTable[newHash] = table[i];
 		}
-		
+
 		table = newTable;
 		assert numPairs == oldNumPairs;
 		rehashing = false;
@@ -463,15 +466,17 @@ public class OpenAddressingHashMap<K, V> implements Map<K, V> {
 	 */
 	public Iterator<K> iterator() {
 
-		int start = 0;
+		int start = 0; // starting position
+		final int startF; // final starting position for the iterator
 
+		// put the starting value at the first non empty spot in the hash table
 		while (start < table.length && (table[start] == null || table[start] == deleted))
 			start++;
 
-		final int startF = start;
+		startF = start;
 
 		return new Iterator<K>() {
-
+			// set index to the starting value
 			int index = startF;
 
 			public boolean hasNext() {
@@ -479,22 +484,16 @@ public class OpenAddressingHashMap<K, V> implements Map<K, V> {
 			}
 
 			public K next() {
-				K key = table[index++].key;
+				K key = table[index++].key; // key gets current index
 
-				for (int i = index; i < table.length; i++) {
+				// find the next non empty position in the hash table
+				while (index < table.length && (table[index] == null || table[index] == deleted))
+					index++;
 
-					if (table[i] == null || table[i] == deleted) {
-						index++;
-						continue;
-					}
-
-					break;
-				}
+				// return the key
 				return key;
 
 			}
-
 		};
-
 	}
 }
