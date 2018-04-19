@@ -152,6 +152,8 @@ public class PerfectHashMap<K, V> implements Map<K, V> {
      */
     private int mask;
     
+    Set<K>[] counts;
+    
     /**
      * Constructor. Takes the keys (all known ahead of time) to set things up to
      * guarantee no collisions.
@@ -160,7 +162,25 @@ public class PerfectHashMap<K, V> implements Map<K, V> {
      */
     @SuppressWarnings("unchecked")
     public PerfectHashMap(K[] keys) {
-         throw new UnsupportedOperationException();
+    	
+    	h = HashFactory.universalHashFunction(findMaskAndGreatestKey(keys), 3);
+    	
+    	//secondaries = (SecondaryMap[]) new PerfectHashMap.SecondaryMap[counts.length];
+    	
+    	for(int i = 0; i < keys.length; i++) {
+    		counts[i] = new ListSet<K>();
+    	}
+    	
+    	for(int i = 0; i < keys.length; i++) 
+    		counts[h.hash(keys[i])].add(keys[i]);
+    	
+    	
+    	for(int i = 0; i < counts.length; i++)
+    		secondaries[i] = new SecondaryMap(counts[i]);
+    		
+    
+    
+    
     }
 
     /**
