@@ -82,6 +82,45 @@ public abstract class HashMapTest extends MapStressTest {
         }
     }
 
+    
+    @Test
+    public void hashGapIdeal() {
+        resetPH();
+        PoorlyHashed a = new PoorlyHashed(1, 39);
+        PoorlyHashed b = new PoorlyHashed(2, 39);
+        PoorlyHashed c = new PoorlyHashed(3, 39);
+        PoorlyHashed d = new PoorlyHashed(4, 39);
+        PoorlyHashed e = new PoorlyHashed(5, 39);
+
+        testHashMap.put(a, 1);
+        testHashMap.put(b, 2);
+        testHashMap.put(c, 3);
+        testHashMap.put(d, 4);
+        testHashMap.put(e, 6);
+        testHashMap.remove(c);
+        assert (testHashMap.get(c) == null);
+        assert (testHashMap.get(e) == 6);
+    }
+    
+    @Test
+    public void hashGapPos() {
+        resetPH();
+        PoorlyHashed a = new PoorlyHashed(1, 40);
+        PoorlyHashed b = new PoorlyHashed(2, 40);
+        PoorlyHashed c = new PoorlyHashed(3, 40);
+        PoorlyHashed d = new PoorlyHashed(4, 40);
+        PoorlyHashed e = new PoorlyHashed(5, 40);
+
+        testHashMap.put(a, 11);
+        testHashMap.put(b, 22);
+        testHashMap.put(c, 33);
+        testHashMap.put(d, 44);
+        testHashMap.put(e, 55);
+        testHashMap.remove(c);
+        assert (testHashMap.get(c) == null);
+        assert (testHashMap.get(e) == 55);
+    }
+
     @Test
     public void sameHashRemove() {
         resetPH();
@@ -452,5 +491,45 @@ public abstract class HashMapTest extends MapStressTest {
         
     }
 
+    @Test
+    public void rehashAfterRemoveGoodHash() {
+        resetSK();
+        SkeletonKey[] keys = new SkeletonKey[40];
+        for (int i = 0; i < 25; i++) {
+            keys[i] = new SkeletonKey(i + "", i, 0);
+            skMap.put(keys[i], "x");
+        }
+        skMap.remove(keys[5]);
+        for (int i = 25; i < 40; i++) {
+            keys[i] = new SkeletonKey(i + "", i, 0);
+            skMap.put(keys[i], "x");
+        }
+        for (int i = 0; i < keys.length; i++)
+            if (i == 5)
+                assertFalse(skMap.containsKey(keys[i]));
+            else
+                assertTrue(skMap.containsKey(keys[i]));
+    }
     
+    @Test
+    public void rehashAfterRemoveBadHash() {
+        resetSK();
+        SkeletonKey[] keys = new SkeletonKey[40];
+        for (int i = 0; i < 25; i++) {
+            keys[i] = new SkeletonKey(i + "", i, 0);
+            skMap.put(keys[i], "x");
+        }
+        skMap.remove(keys[5]);
+        for (int i = 25; i < 40; i++) {
+            keys[i] = new SkeletonKey(i + "", i, 0);
+            skMap.put(keys[i], "x");
+        }
+        for (int i = 0; i < keys.length; i++)
+            if (i == 5)
+                assertFalse(skMap.containsKey(keys[i]));
+            else
+                assertTrue(skMap.containsKey(keys[i]));
+    }
+    
+   
 }

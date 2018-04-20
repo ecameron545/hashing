@@ -177,10 +177,6 @@ public class PerfectHashMap<K, V> implements Map<K, V> {
     	
     	for(int i = 0; i < counts.length; i++)
     		secondaries[i] = new SecondaryMap(counts[i]);
-    		
-    
-    
-    
     }
 
     /**

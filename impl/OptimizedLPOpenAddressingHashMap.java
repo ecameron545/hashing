@@ -59,7 +59,10 @@ public class OptimizedLPOpenAddressingHashMap<K, V> extends OpenAddressingHashMa
 			int ideal = h.hash(table[current].key);
 
 			// if ideal is less than gap than we can move the current to gap
-			if (ideal <= gap) {
+			if ((ideal <= gap)
+					|| (current < ideal && ideal <= gap)
+					|| (gap < current && current < ideal)
+					&& gap >= 0) {
 				table[gap] = table[current];
 				gap = current;
 			}
