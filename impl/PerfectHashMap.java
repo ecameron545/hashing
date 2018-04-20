@@ -14,260 +14,337 @@ import impl.ListSet;
  * that doesn't exist. However, we assume put will never be called using a key
  * that isn't supplied to the constructor; behavior is unspecified otherwise.
  * 
- * @author Thomas VanDrunen
- * CSCI 345, Wheaton College
- * March 17, 2015
- * @param <K> The key-type of the map
- * @param <V>The value-type of the map
+ * @author Thomas VanDrunen CSCI 345, Wheaton College March 17, 2015
+ * @param <K>
+ *            The key-type of the map
+ * @param <V>The
+ *            value-type of the map
  */
 
 public class PerfectHashMap<K, V> implements Map<K, V> {
 
-    /**
-     * Secondary maps for the buckets
-     */
-    private class SecondaryMap implements Map<K, V> {
+	/**
+	 * Secondary maps for the buckets
+	 */
+	private class SecondaryMap implements Map<K, V> {
 
-        /**
-         * The keys in this secondary map. This is necessary to check when get
-         * and containsKey are called on spurious keys and also for the
-         * iterator.
-         */
-        K[] keys;
+		/**
+		 * The keys in this secondary map. This is necessary to check when get and
+		 * containsKey are called on spurious keys and also for the iterator.
+		 */
+		K[] keys;
 
-        /**
-         * The values in the secondary map.
-         */
-        V[] values;
+		/**
+		 * The values in the secondary map.
+		 */
+		V[] values;
 
-        /**
-         * The number of slots in the arrays, computed as the square of the
-         * number of keys that can go here.
-         */
-        int m;
+		/**
+		 * The number of slots in the arrays, computed as the square of the number of
+		 * keys that can go here.
+		 */
+		int m;
 
-        /**
-         * The hash function, drawn from class Hpm
-         */
-        HashFunction<Object> h;
+		/**
+		 * The hash function, drawn from class Hpm
+		 */
+		HashFunction<Object> h;
 
-        /**
-         * Constructor. Given a set of keys, make appropriately
-         * size arrays and a hash set that makes no collisions.
-         * @param givenKeys
-         */
-        @SuppressWarnings("unchecked")
-        SecondaryMap(Set<K> givenKeys) {
-             throw new UnsupportedOperationException();
-        }
+		/**
+		 * Constructor. Given a set of keys, make appropriately size arrays and a hash
+		 * set that makes no collisions.
+		 * 
+		 * @param givenKeys
+		 */
+		@SuppressWarnings("unchecked")
+		SecondaryMap(Set<K> givenKeys) {
 
-        /**
-         * Add an association to the map. We assume the given
-         * key was known ahead of time.
-         * @param key The key to this association
-         * @param val The value to which this key is associated
-         */
-        public void put(K key, V val) {
-            int pos = h.hash(key);
-            keys[pos] = key;
-            values[pos] = val;
-        }
+			m = givenKeys.size();
+			if (m == 0)
+				return;
+			
+			K[] tempKeys = (K[]) new Object[m];
 
-        /**
-         * Get the value for a key.
-         * @param key The key whose value we're retrieving.
-         * @return The value associated with this key, null if none exists
-         */
-       public V get(K key) {
-            if (!containsKey(key))
-                return null;
-            return values[h.hash(key)];
-        }
+			m *= m;
 
-       /**
-        * Test if this map contains an association for this key.
-        * @param key The key to test.
-        * @return true if there is an association for this key, false otherwise
-        */
-       public boolean containsKey(K key) {
-            if (m == 0)
-                return false;
-            int pos = h.hash(key);
-            return keys[pos] != null
-                    // next part necessary only if we assume
-                    // keys that can't be put may be tested
-                    && keys[pos].equals(key);
-        }
+			keys = (K[]) new Object[m];
+			values = (V[]) new Object[m];
 
-       /**
-        * Remove the association for this key, if it exists.
-        * @param key The key to remove
-        */
-       public void remove(K key) {
-            if (containsKey(key))
-                keys[h.hash(key)] = null;
-        }
+			int i = 0;
+			Iterator<K> it = givenKeys.iterator();
+			while (it.hasNext())
+				tempKeys[i++] = (K) it.next();
 
-       /**
-        * The iterator for this portion of the map.
-        */
-        public Iterator<K> iterator() { 
-            // In theory you don't need to write this; all you need
-            // to support is PerfectHashMap.iterator().
-            // However, in my version the iterator for PerfectHashMap
-            // relied on iterators of the secondary maps.
-            // You could use a different approach.
-             throw new UnsupportedOperationException();
-        }
-        
-    }
+			// square of the size of the given keys
+			p = findMaskAndGreatestKey(tempKeys);
+			p = findGreatestPrime(p);
+			boolean collisions = true;
+			while (collisions) {
+				h = HashFactory.universalHashFunction(p, m);
+				collisions = false;
+				for (int j = 0; j < tempKeys.length; j++) {
+					int secHash = h.hash(tempKeys[j]);
+					if (keys[secHash] != null) {
+						collisions = true;
+						break;
+					}
+					keys[secHash] = tempKeys[j];
+				}
+				
+				keys = (K[]) new Object[m];
 
-    /**
-     * Secondary maps
-     */
-    private SecondaryMap[] secondaries;
+			}
+		}
 
-    /**
-     * A prime number greater than the greatest hash value
-     */
-    private int p;
+		/**
+		 * Add an association to the map. We assume the given key was known ahead of
+		 * time.
+		 * 
+		 * @param key
+		 *            The key to this association
+		 * @param val
+		 *            The value to which this key is associated
+		 */
+		public void put(K key, V val) {
+			int pos = h.hash(key);
+			keys[pos] = key;
+			values[pos] = val;
+		}
 
-    /**
-     * A parameter to the hash function; here, the number of keys known ahead of
-     * time.
-     */
-    private int m;
+		/**
+		 * Get the value for a key.
+		 * 
+		 * @param key
+		 *            The key whose value we're retrieving.
+		 * @return The value associated with this key, null if none exists
+		 */
+		public V get(K key) {
+			if (!containsKey(key))
+				return null;
+			return values[h.hash(key)];
+		}
 
-    /**
-     * The primary hash function
-     */
-    private HashFunction<Object> h;
+		/**
+		 * Test if this map contains an association for this key.
+		 * 
+		 * @param key
+		 *            The key to test.
+		 * @return true if there is an association for this key, false otherwise
+		 */
+		public boolean containsKey(K key) {
+			if (m == 0)
+				return false;
+			int pos = h.hash(key);
+			return keys[pos] != null
+					// next part necessary only if we assume
+					// keys that can't be put may be tested
+					&& keys[pos].equals(key);
+		}
 
-    /**
-     * A bit mask to grab certain bits from the result of a
-     * call to hashCode(). Recommended that this is one less than
-     * a power of 2, and hence we will grab a certain number of
-     * lower ordered bits. This is used to reduce the range
-     * of the integer keys and hence allow for a smaller prime p.
-     */
-    private int mask;
-    
-    Set<K>[] counts;
-    
-    /**
-     * Constructor. Takes the keys (all known ahead of time) to set things up to
-     * guarantee no collisions.
-     * 
-     * @param keys
-     */
-    @SuppressWarnings("unchecked")
-    public PerfectHashMap(K[] keys) {
-    	
-    	h = HashFactory.universalHashFunction(findMaskAndGreatestKey(keys), 3);
-    	
-    	//secondaries = (SecondaryMap[]) new PerfectHashMap.SecondaryMap[counts.length];
-    	
-    	for(int i = 0; i < keys.length; i++) {
-    		counts[i] = new ListSet<K>();
-    	}
-    	
-    	for(int i = 0; i < keys.length; i++) 
-    		counts[h.hash(keys[i])].add(keys[i]);
-    	
-    	
-    	for(int i = 0; i < counts.length; i++)
-    		secondaries[i] = new SecondaryMap(counts[i]);
-    }
+		/**
+		 * Remove the association for this key, if it exists.
+		 * 
+		 * @param key
+		 *            The key to remove
+		 */
+		public void remove(K key) {
+			if (containsKey(key))
+				keys[h.hash(key)] = null;
+		}
 
-    /**
-     * Helper function (intended to be used by the constructor)
-     * to find an appropriate mask for the keys and the greatest 
-     * integer key using that mask. The mask, stored as an instance
-     * variable, is the greatest value one less than a power of two
-     * which will produce unique integers when bitwise-anded with
-     * each key's hashcode.
-     * @param keys The set of keys, given to the constructor.
-     * @return The greatest value of any key's hashcode bitwise-anded
-     * by the mask.
-     */
-    private int findMaskAndGreatestKey(K[] keys) {
-        // The greatest code found so for the current mask
-        int greatestCode;
-        // Our current guess for the least mask
-        mask = 31;
-        // Do any keys' hashcodes have identical bits when
-        // bitwise-anded with the current mask?
-        boolean doubleHit; 
+		/**
+		 * The iterator for this portion of the map.
+		 */
+		public Iterator<K> iterator() {
+			// In theory you don't need to write this; all you need
+			// to support is PerfectHashMap.iterator().
+			// However, in my version the iterator for PerfectHashMap
+			// relied on iterators of the secondary maps.
+			// You could use a different approach.
+			throw new UnsupportedOperationException();
+		}
 
-        // Repeatedly guess a mask until we find one
-        // that gives no double hits.
-        do {
-            // Increase our mask guess to the next integer
-            // that is one less than a power of two.
-            // (Effectively 63 is our first guess.)
-            mask = (mask << 1) + 1;
-            // We have not found any double hits so far on this mask
-            doubleHit = false;
-            // hit[i] is true iff we have inspected a key whose
-            // hashcode bitwise-anded with the mask equals i.
-            // Note that mask itself is the greatest possible
-            // result of bitwise-anding a value with mask.
-            boolean[] hits = new boolean[mask+1];
-            greatestCode = 0;
-            for (K key : keys) {
-                int code = (key.hashCode() & mask);
-                if (code > greatestCode)
-                    greatestCode = code;
-                if (hits[code]) 
-                    doubleHit = true;
-                else hits[code] = true;
-            }
-        }
-        while (doubleHit);
-        return greatestCode;
-    }
+		/**
+		 * Find greatest prime number after a given index
+		 * 
+		 * @param the
+		 *            index from which to start searching
+		 * @return the greatest prime number after index
+		 */
 
-    /**
-     * Add an association to the map. We assume the given
-     * key was known ahead of time.
-     * @param key The key to this association
-     * @param val The value to which this key is associated
-     */
-    public void put(K key, V val) {
-        secondaries[h.hash(key)].put(key, val);
-    }
+		public int findGreatestPrime(int index) {
+			int nonPrime = index;
+			nonPrime++;
+			for (int i = 2; i < nonPrime; i++) {
+				if (nonPrime % i == 0) {
+					nonPrime++;
+					i = 2;
+				} else {
+					continue;
+				}
+			}
+			return nonPrime;
+		}
+	}
 
-    /**
-     * Get the value for a key.
-     * @param key The key whose value we're retrieving.
-     * @return The value associated with this key, null if none exists
-     */
-    public V get(K key) {
-        return secondaries[h.hash(key)].get(key);
-    }
+	/**
+	 * Secondary maps
+	 */
+	private SecondaryMap[] secondaries;
 
-   /**
-    * Test if this map contains an association for this key.
-    * @param key The key to test.
-    * @return true if there is an association for this key, false otherwise
-    */
-    public boolean containsKey(K key) {
-        return secondaries[h.hash(key)].containsKey(key);
-    }
+	/**
+	 * A prime number greater than the greatest hash value
+	 */
+	private int p;
 
-    /**
-     * Remove the association for this key, if it exists.
-     * @param key The key to remove
-     */
-    public void remove(K key) {
-        secondaries[h.hash(key)].remove(key);
-    }
+	/**
+	 * A parameter to the hash function; here, the number of keys known ahead of
+	 * time.
+	 */
+	private int m;
 
-    /**
-     * Return an iterator over this map
-     */
-    public Iterator<K> iterator() {
-         throw new UnsupportedOperationException();
-    }
+	/**
+	 * The primary hash function
+	 */
+	private HashFunction<Object> h;
+
+	/**
+	 * A bit mask to grab certain bits from the result of a call to hashCode().
+	 * Recommended that this is one less than a power of 2, and hence we will grab a
+	 * certain number of lower ordered bits. This is used to reduce the range of the
+	 * integer keys and hence allow for a smaller prime p.
+	 */
+	private int mask;
+
+	/**
+	 * Constructor. Takes the keys (all known ahead of time) to set things up to
+	 * guarantee no collisions.
+	 * 
+	 * @param keys
+	 */
+	@SuppressWarnings("unchecked")
+	public PerfectHashMap(K[] keys) {
+
+		if(keys.length < 1)
+			return;
+		
+		p = findMaskAndGreatestKey(keys);
+		m = keys.length;
+
+		Set<K>[] counts = new ListSet[keys.length];
+		secondaries = (SecondaryMap[]) new PerfectHashMap.SecondaryMap[counts.length];
+
+		h = HashFactory.universalHashFunction(p, m);
+
+		for (int i = 0; i < keys.length; i++) {
+			counts[i] = new ListSet<K>();
+		}
+
+		for (int i = 0; i < keys.length; i++)
+			counts[h.hash(keys[i])].add(keys[i]);
+
+		for (int i = 0; i < counts.length; i++)
+			secondaries[i] = new SecondaryMap(counts[i]);
+	}
+
+	/**
+	 * Helper function (intended to be used by the constructor) to find an
+	 * appropriate mask for the keys and the greatest integer key using that mask.
+	 * The mask, stored as an instance variable, is the greatest value one less than
+	 * a power of two which will produce unique integers when bitwise-anded with
+	 * each key's hashcode.
+	 * 
+	 * @param keys
+	 *            The set of keys, given to the constructor.
+	 * @return The greatest value of any key's hashcode bitwise-anded by the mask.
+	 */
+	private int findMaskAndGreatestKey(K[] keys) {
+		// The greatest code found so for the current mask
+		int greatestCode;
+		// Our current guess for the least mask
+		mask = 31;
+		// Do any keys' hashcodes have identical bits when
+		// bitwise-anded with the current mask?
+		boolean doubleHit;
+
+		// Repeatedly guess a mask until we find one
+		// that gives no double hits.
+		do {
+			// Increase our mask guess to the next integer
+			// that is one less than a power of two.
+			// (Effectively 63 is our first guess.)
+			mask = (mask << 1) + 1;
+			// We have not found any double hits so far on this mask
+			doubleHit = false;
+			// hit[i] is true iff we have inspected a key whose
+			// hashcode bitwise-anded with the mask equals i.
+			// Note that mask itself is the greatest possible
+			// result of bitwise-anding a value with mask.
+			boolean[] hits = new boolean[mask + 1];
+			greatestCode = 0;
+			for (K key : keys) {
+				int code = (key.hashCode() & mask);
+				if (code > greatestCode)
+					greatestCode = code;
+				if (hits[code])
+					doubleHit = true;
+				else
+					hits[code] = true;
+			}
+		} while (doubleHit);
+		return greatestCode;
+	}
+
+	/**
+	 * Add an association to the map. We assume the given key was known ahead of
+	 * time.
+	 * 
+	 * @param key
+	 *            The key to this association
+	 * @param val
+	 *            The value to which this key is associated
+	 */
+	public void put(K key, V val) {
+		secondaries[h.hash(key)].put(key, val);
+	}
+
+	/**
+	 * Get the value for a key.
+	 * 
+	 * @param key
+	 *            The key whose value we're retrieving.
+	 * @return The value associated with this key, null if none exists
+	 */
+	public V get(K key) {
+		return secondaries[h.hash(key)].get(key);
+	}
+
+	/**
+	 * Test if this map contains an association for this key.
+	 * 
+	 * @param key
+	 *            The key to test.
+	 * @return true if there is an association for this key, false otherwise
+	 */
+	public boolean containsKey(K key) {
+		return secondaries[h.hash(key)].containsKey(key);
+	}
+
+	/**
+	 * Remove the association for this key, if it exists.
+	 * 
+	 * @param key
+	 *            The key to remove
+	 */
+	public void remove(K key) {
+		secondaries[h.hash(key)].remove(key);
+	}
+
+	/**
+	 * Return an iterator over this map
+	 */
+	public Iterator<K> iterator() {
+		throw new UnsupportedOperationException();
+	}
 
 }
