@@ -5,6 +5,7 @@ import java.util.NoSuchElementException;
 import adt.Map;
 import adt.Set;
 import impl.ListSet;
+import java.util.Collections;
 
 /**
  * PerfectHashMap
@@ -59,29 +60,40 @@ public class PerfectHashMap<K, V> implements Map<K, V> {
 		@SuppressWarnings("unchecked")
 		SecondaryMap(Set<K> givenKeys) {
 
+			// size of the secondary array
 			m = givenKeys.size();
+			
+			// if there are no keys hashed to this secondary array return
 			if (m == 0)
 				return;
-			
+
+			// tempKeys holds the keys before the secondary hash function is called on them
 			K[] tempKeys = (K[]) new Object[m];
 
+			// square of the size of the given keys
 			m *= m;
 
 			keys = (K[]) new Object[m];
 			values = (V[]) new Object[m];
 
+			// transfer the keys from the set to the tempKeys array
 			int i = 0;
 			Iterator<K> it = givenKeys.iterator();
 			while (it.hasNext())
 				tempKeys[i++] = (K) it.next();
 
-			// square of the size of the given keys
+			// p is the greatest prime number of tempKeys. Used in the secondary hash function
 			p = findMaskAndGreatestKey(tempKeys);
 			p = findGreatestPrime(p);
 			boolean collisions = true;
+			
+			// repeat until there are no collisions in the secondary hash table
 			while (collisions) {
+				// make a new hash function
 				h = HashFactory.universalHashFunction(p, m);
 				collisions = false;
+				
+				// hash the keys. if there is a collision break and repeat
 				for (int j = 0; j < tempKeys.length; j++) {
 					int secHash = h.hash(tempKeys[j]);
 					if (keys[secHash] != null) {
@@ -90,9 +102,9 @@ public class PerfectHashMap<K, V> implements Map<K, V> {
 					}
 					keys[secHash] = tempKeys[j];
 				}
-				
-				keys = (K[]) new Object[m];
 
+				// reset the  key array
+				keys = (K[]) new Object[m];
 			}
 		}
 
@@ -156,12 +168,43 @@ public class PerfectHashMap<K, V> implements Map<K, V> {
 		 * The iterator for this portion of the map.
 		 */
 		public Iterator<K> iterator() {
-			// In theory you don't need to write this; all you need
-			// to support is PerfectHashMap.iterator().
-			// However, in my version the iterator for PerfectHashMap
-			// relied on iterators of the secondary maps.
-			// You could use a different approach.
-			throw new UnsupportedOperationException();
+			
+			// if the keys are null return null
+			if(keys == null)
+				return null;
+			
+			// go to the first key in this secondary hash-map
+			int start = 0;
+			while(start < m && keys[start] == null)
+				start++;
+			
+			// if there are no more keys in this secondary hash-map return null
+			if(start == m)
+				return null;
+			
+			// final variable for the iterator
+			int finalStart = start;
+			
+			
+			return new Iterator<K>() {
+				// starting position
+				int current = finalStart;
+
+				public boolean hasNext() {
+					return current < m;
+				}
+
+				public K next() {
+					int next = current++;
+					
+					// find next key
+					while (current < m && keys[current] == null) {
+						current++;
+					}
+					
+					return keys[next];
+				}
+			};
 		}
 
 		/**
@@ -225,24 +268,26 @@ public class PerfectHashMap<K, V> implements Map<K, V> {
 	@SuppressWarnings("unchecked")
 	public PerfectHashMap(K[] keys) {
 
-		if(keys.length < 1)
-			return;
-		
-		p = findMaskAndGreatestKey(keys);
 		m = keys.length;
+		// prime number for the hash function
+		p = findMaskAndGreatestKey(keys);
 
+		// set to record how many keys hash to each position in the secondaries array
 		Set<K>[] counts = new ListSet[keys.length];
 		secondaries = (SecondaryMap[]) new PerfectHashMap.SecondaryMap[counts.length];
 
+		// primary hash function to hash keys to positions in secondaries
 		h = HashFactory.universalHashFunction(p, m);
 
-		for (int i = 0; i < keys.length; i++) {
+		// initialize counts
+		for (int i = 0; i < keys.length; i++)
 			counts[i] = new ListSet<K>();
-		}
-
+		
+		// add keys to counts
 		for (int i = 0; i < keys.length; i++)
 			counts[h.hash(keys[i])].add(keys[i]);
 
+		// make new secondary hash-maps for each set in counts
 		for (int i = 0; i < counts.length; i++)
 			secondaries[i] = new SecondaryMap(counts[i]);
 	}
@@ -344,7 +389,54 @@ public class PerfectHashMap<K, V> implements Map<K, V> {
 	 * Return an iterator over this map
 	 */
 	public Iterator<K> iterator() {
-		throw new UnsupportedOperationException();
-	}
+		
+		int start = 0;
 
+		// move start to the first non null secondary iterator
+		while(start < m && secondaries[start].iterator() == null)
+			start++;
+		
+		// if there is nothing to iterate in the secondary array, return empty iterator
+		if(start == m)
+			return Collections.emptyIterator();
+		
+		// final variable for the iterator
+		final int finalStart = start;
+		
+		
+		return new Iterator<K>() {
+		
+			int current = finalStart;
+			// secondary iterator
+			Iterator<K> it = secondaries[current].iterator(); 
+			
+			public boolean hasNext() {
+				return current < m && it != null && it.hasNext();
+			}
+			
+			public K next() {
+				K ret = it.next();
+
+				// if there are no more values in the current secondary array which
+				// is being iterated by it, move to the next valid secondary array iterator
+				if(!it.hasNext()) {
+
+
+					// move to the next valid secondary array iterator
+					current++;
+					while((current < m) && (secondaries[current].iterator() == null)) {
+						current++;
+					}
+					
+					// if start == m it means there are no more items in the hashtable
+					if(current == m)
+						it = null;
+					else
+						it = secondaries[current].iterator();
+				}
+				
+				return ret;
+			}
+		};
+	}
 }
